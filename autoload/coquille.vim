@@ -54,7 +54,11 @@ function! coquille#KillSession()
         execute 'bdelete' . b:info_buf
         Py coquille.kill_coqtop()
 
-        setlocal ei=InsertEnter,BufEnter,BufLeave
+        au! InsertEnter <buffer>
+        au! BufEnter <buffer>
+        au! BufLeave <buffer>
+
+        unlet b:goal_buf b:info_buf
     endif
 endfunction
 
@@ -90,23 +94,23 @@ function! coquille#CoqideMapping()
 endfunction
 
 function! coquille#LeaderMapping()
-    map <buffer> <silent> <leader>cc :CoqLaunch<CR>
-    map <buffer> <silent> <leader>cq :CoqKill<CR>
+    map <silent> <leader>cc :CoqLaunch<CR>
+    map <silent> <leader>cq :CoqKill<CR>
 
-    map <buffer> <silent> <leader>cj :CoqNext<CR>
-    map <buffer> <silent> <leader>ck :CoqUndo<CR>
-    map <buffer> <silent> <leader>cl :CoqToCursor<CR>
+    map <silent> <leader>cj :CoqNext<CR>
+    map <silent> <leader>ck :CoqUndo<CR>
+    map <silent> <leader>cl :CoqToCursor<CR>
 
-    imap <buffer> <silent> <leader>cj <C-\><C-o>:CoqNext<CR>
-    imap <buffer> <silent> <leader>ck <C-\><C-o>:CoqUndo<CR>
-    imap <buffer> <silent> <leader>cl <C-\><C-o>:CoqToCursor<CR>
+    imap <silent> <leader>cj <C-\><C-o>:CoqNext<CR>
+    imap <silent> <leader>ck <C-\><C-o>:CoqUndo<CR>
+    imap <silent> <leader>cl <C-\><C-o>:CoqToCursor<CR>
 
-    map <buffer> <silent> <leader>c1 :Coq SearchAbout <C-r>=expand("<cword>")<CR>.<CR>
-    map <buffer> <silent> <leader>c2 :Coq Check <C-r>=expand("<cword>")<CR>.<CR>
-    map <buffer> <silent> <leader>c3 :Coq About <C-r>=expand("<cword>")<CR>.<CR>
-    map <buffer> <silent> <leader>c4 :Coq Print <C-r>=expand("<cword>")<CR>.<CR>
-    map <buffer> <silent> <leader>c5 :Coq About <C-r>=expand("<cword>")<CR>.<CR>
-    map <buffer> <silent> <leader>c6 :Coq Locate <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>c1 :Coq SearchAbout <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>c2 :Coq Check <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>c3 :Coq About <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>c4 :Coq Print <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>c5 :Coq About <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>c6 :Coq Locate <C-r>=expand("<cword>")<CR>.<CR>
 endfunction
 
 function! coquille#Launch(...)
