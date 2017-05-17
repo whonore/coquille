@@ -1,4 +1,4 @@
-let s:current_dir=expand("<sfile>:p:h")
+let s:current_dir=expand("<sfile>:p:h") "TODO: probably needs to be b: variable too
 let g:counter=0
 
 if !exists('coquille_auto_move')

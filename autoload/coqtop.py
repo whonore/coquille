@@ -104,7 +104,7 @@ def encode_value(v):
         xml = build('bool', str(v).lower())
         xml.text = str(v)
         return xml
-    elif isinstance(v, str):
+    elif isinstance(v, str) or isinstance(v, unicode):
         xml = build('string')
         xml.text = v
         return xml
@@ -162,7 +162,6 @@ class Coqtop(object):
 
     def get_answer(self):
         fd = self.coqtop.stdout.fileno()
-        messageNode = None
         data = ''
         while True:
             try:
@@ -177,14 +176,17 @@ class Coqtop(object):
                             shouldWait = False
                             valueNode = c
                         if c.tag == 'message':
-                            messageNode = c[1]
+                            if messageNode is not None:
+                                messageNode = messageNode + "\n\n" + parse_value(c[2])
+                            else:
+                                messageNode = parse_value(c[2])
                     if shouldWait:
                         continue
                     else:
                         vp = parse_response(valueNode)
                         if messageNode is not None:
                             if isinstance(vp, Ok):
-                                return Ok(vp.val, parse_value(messageNode).val)
+                                return Ok(vp.val, messageNode)
                         return vp
                 except ET.ParseError:
                     continue
@@ -244,7 +246,7 @@ class Coqtop(object):
             return self.state_id
 
     def advance(self, cmd, encoding = 'utf-8'):
-        r = self.call('Add', ((cmd, -1), (self.cur_state(), True)), encoding)
+        r = self.call('Add', ((cmd.decode(encoding), -1), (self.cur_state(), True)), encoding)
         if r is None:
             return r
         if isinstance(r, Err):
@@ -253,6 +255,7 @@ class Coqtop(object):
         self.state_id = r.val[0]
         return r
 
+    # TODO: assert fails if rewind called right after launching
     def rewind(self, step = 1):
         assert step <= len(self.states)
         idx = len(self.states) - step
