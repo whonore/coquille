@@ -1,5 +1,6 @@
-let s:current_dir=expand("<sfile>:p:h") "TODO: probably needs to be b: variable too
-let g:counter=0
+let s:current_dir = expand("<sfile>:p:h") "TODO: probably needs to be b: variable too
+let g:counter = 0
+let g:proj_file = '_CoqProject'
 
 if !exists('coquille_auto_move')
     let g:coquille_auto_move="false"
@@ -101,11 +102,19 @@ function! coquille#Launch(...)
     else
         let b:coq_running = 1
 
-        if exists('g:coquille_args')
-            let extra_args = split(g:coquille_args)
+        if filereadable(g:proj_file)
+            let proj_args = split(join(readfile(g:proj_file)))
         else
-            let extra_args = []
+            let proj_args = []
         endif
+
+        if exists('g:coquille_args')
+            let coq_args = split(g:coquille_args)
+        else
+            let coq_args = []
+        endif
+
+        let extra_args = proj_args + coq_args
 
         " initialize the plugin (launch coqtop)
         py coquille.launch_coq(*vim.eval("map(copy(extra_args+a:000),'expand(v:val)')"))
