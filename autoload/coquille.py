@@ -1,6 +1,7 @@
 import vim
 
 import re
+import os
 import xml.etree.ElementTree as ET
 import coqtop as CT
 
@@ -332,6 +333,71 @@ def rewind_to(line, col):
     lst = filter(predicate, bdata['encountered_dots'])
     steps = len(bdata['encountered_dots']) - len(lst)
     coq_rewind(steps)
+
+# TODO: handle case with multiple matches
+def parse_locate(msg):
+    msg = msg.split()
+    ltype = msg[0]
+
+    if ltype == 'No':
+        return None, '', ''
+
+    where = msg[1].split('.')
+    if where[0] == 'Coq':
+        return 'Coq', '', ''
+    elif where[0] == 'Top':
+        lfile = vim.eval("expand('%:p')")
+        return ltype, lfile, where[-1]
+    else:
+        if ltype == 'Module':
+            lfile = os.path.abspath(os.path.join(*where)) + '.v'
+            lname = ''
+        else:
+            lfile = os.path.abspath(os.path.join(*where[:-1])) + '.v'
+            lname = where[-1]
+        return ltype, lfile, lname
+
+    return 'Err', ' '.join(msg), ''
+
+def coq_goto(target):
+    bdata = buf_data[vim.current.buffer]
+    if bdata['coqtop'].coqtop is None:
+        print("Error: Coqtop isn't running. Are you sure you called :CoqLaunch?")
+        return
+
+    raw_query = 'Locate ' + target + '.'
+
+    encoding = vim.eval("&encoding") or 'utf-8'
+
+    response = bdata['coqtop'].query(raw_query, encoding)
+
+    if response is None:
+        vim.command("call coquille#KillSession()")
+        print('ERROR: the Coq process died')
+        return
+
+    if isinstance(response, CT.Ok):
+        if response.msg is not None:
+            ltype, lfile, lname = parse_locate(response.msg)
+
+            if ltype is None:
+                print(response.msg)
+            elif ltype == 'Coq':
+                print('Part of coq stdlib')
+            elif ltype == 'Err':
+                print('Unrecognized response from Locate:')
+                print(lfile)
+            else:
+                print(ltype, lfile, lname)
+                vim.command('argadd ' + lfile)
+                vim.command('hide next')
+                if lname is not None:
+                    vim.command('0/' + lname)
+
+    elif isinstance(response, CT.Err):
+        print(response.err.text)
+    else:
+        print("(ANOMALY) unknown answer: %s" % ET.tostring(response)) # ugly
 
 #############################
 # Communication with Coqtop #

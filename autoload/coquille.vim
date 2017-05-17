@@ -105,12 +105,23 @@ function! coquille#LeaderMapping()
     imap <silent> <leader>ck <C-\><C-o>:CoqUndo<CR>
     imap <silent> <leader>cl <C-\><C-o>:CoqToCursor<CR>
 
-    map <silent> <leader>c1 :Coq SearchAbout <C-r>=expand("<cword>")<CR>.<CR>
-    map <silent> <leader>c2 :Coq Check <C-r>=expand("<cword>")<CR>.<CR>
-    map <silent> <leader>c3 :Coq About <C-r>=expand("<cword>")<CR>.<CR>
-    map <silent> <leader>c4 :Coq Print <C-r>=expand("<cword>")<CR>.<CR>
-    map <silent> <leader>c5 :Coq About <C-r>=expand("<cword>")<CR>.<CR>
-    map <silent> <leader>c6 :Coq Locate <C-r>=expand("<cword>")<CR>.<CR>
+    " TODO: recognize qualified (with '.') names as well
+    map <silent> <leader>cs :Coq SearchAbout <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>ch :Coq Check <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>ca :Coq About <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>cp :Coq Print <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>cf :Coq Locate <C-r>=expand("<cword>")<CR>.<CR>
+
+    map <silent> <leader>co :CoqGoTo <C-r>=expand("<cword>")<CR><CR>
+endfunction
+
+function! coquille#RestorePanels()
+    let l:winnb = winnr()
+    let l:goal_buf = b:goal_buf
+    let l:info_buf = b:info_buf
+    execute 'rightbelow vertical sbuffer ' . l:goal_buf
+    execute 'rightbelow sbuffer ' . l:info_buf
+    execute l:winnb . 'wincmd w'
 endfunction
 
 function! coquille#Launch(...)
@@ -145,6 +156,8 @@ function! coquille#Launch(...)
 
         command! -buffer -nargs=* Coq call coquille#RawQuery(<f-args>)
 
+        command! -buffer -nargs=1 CoqGoTo Py coquille.coq_goto(<f-args>)
+
         call coquille#ShowPanels()
 
         " Automatically sync the buffer when entering insert mode: this is usefull
@@ -155,7 +168,9 @@ function! coquille#Launch(...)
         " nothing really problematic will happen, as sync will be called the next
         " time you explicitly call a command (be it 'rewind' or 'interp')
         au InsertEnter <buffer> Py coquille.sync()
+        au BufLeave <buffer> only
         au BufLeave <buffer> Py coquille.hide_color()
+        au BufEnter <buffer> call coquille#RestorePanels()
         au BufEnter <buffer> Py coquille.reset_color(); coquille.remem_goal()
     endif
 endfunction"
@@ -170,16 +185,6 @@ function! coquille#Register()
         let b:checked = -1
         let b:sent    = -1
         let b:errors  = -1
-    else
-        let l:winnb = winnr()
-        only
-        if exists('b:goal_buf')
-            let l:goal_buf = b:goal_buf
-            let l:info_buf = b:info_buf
-            execute 'rightbelow vertical sbuffer ' . l:goal_buf
-            execute 'rightbelow sbuffer ' . l:info_buf
-            execute l:winnb . 'wincmd w'
-        endif
     endif
 
     command! -bar -buffer -nargs=* -complete=file CoqLaunch call coquille#Launch(<f-args>)
