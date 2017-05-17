@@ -25,7 +25,6 @@ call vimbufsync#init()
 Py import sys, vim
 Py if not vim.eval("g:coquille#current_dir") in sys.path:
 \    sys.path.append(vim.eval("g:coquille#current_dir"))
-Py print(sys.path)
 Py import coquille
 
 function! coquille#ShowPanels()
