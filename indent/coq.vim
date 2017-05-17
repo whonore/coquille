@@ -5,7 +5,7 @@
 "               written by Jean-Francois Yuen, Mike Leary and Markus Mottl
 " Last Change: 2007 Dec 2  - Bugfix.
 "              2007 Nov 28 - Handle proofs that do not start with 'Proof'.
-"              2007 Nov 27 - Initial version. 
+"              2007 Nov 27 - Initial version.
 
 " Only load this indent file when no other was loaded.
 if exists("b:did_indent")
@@ -18,6 +18,8 @@ setlocal indentexpr=GetCoqIndent()
 setlocal indentkeys=o,O,0=.,0=end,0=End,0=in,0=\|,0=Qed,0=Defined,0=Abort,0=Admitted,0},0)
 setlocal nolisp
 setlocal nosmartindent
+setlocal shiftwidth=2
+setlocal tabstop=2
 
 " Comment handling
 if !exists("no_coq_comments")
@@ -91,7 +93,7 @@ let s:tactic = '\C\<\%(absurd\|apply\|assert\|assumption\|auto\|case_eq\|change\
         " current line begins with '|':
       elseif currentline =~ '^\s*|'
         return ind
-        
+
         " start of proof
       elseif previousline =~ '^\s*Proof\.$'
         let s:inside_proof = 1
