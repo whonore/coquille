@@ -5,43 +5,45 @@ import xml.etree.ElementTree as ET
 import coqtop as CT
 
 from collections import deque
+from collections import defaultdict as ddict
 
 import vimbufsync
 vimbufsync.check_version("0.1.0", who="coquille")
 
 #: See vimbufsync ( https://github.com/def-lkb/vimbufsync )
-saved_sync = None
-
 #: Keeps track of what have been checked by Coq, and what is waiting to be
 #: checked.
-encountered_dots = []
-send_queue = deque([])
-
-error_at = None
-
-info_msg = None
+buf_data = ddict(lambda:
+        {'saved_sync': None,
+         'encountered_dots': None,
+         'send_queue': deque([]),
+         'error_at': None,
+         'info_msg': None,
+         'goal_msg': None,
+         'coqtop': None})
 
 ###################
 # synchronization #
 ###################
 
 def sync():
-    global saved_sync
+    bdata = buf_data[vim.current.buffer]
+
     curr_sync = vimbufsync.sync()
-    if not saved_sync or curr_sync.buf() != saved_sync.buf():
+    if not bdata['saved_sync'] or curr_sync.buf() != bdata['saved_sync'].buf():
         _reset()
     else:
-        (line, col) = saved_sync.pos()
+        (line, col) = bdata['saved_sync'].pos()
         rewind_to(line - 1, col) # vim indexes from lines 1, coquille from 0
-    saved_sync = curr_sync
+    bdata['saved_sync'] = curr_sync
 
 def _reset():
-    global saved_sync, encountered_dots, info_msg, error_at, send_queue
-    encountered_dots = []
-    send_queue = deque([])
-    saved_sync = None
-    error_at   = None
-    info_msg   = None
+    bdata = buf_data[vim.current.buffer]
+    bdata['encountered_dots'] = []
+    bdata['send_queue'] = deque([])
+    bdata['saved_sync'] = None
+    bdata['error_at']   = None
+    bdata['info_msg']   = None
     reset_color()
 
 #####################
@@ -49,26 +51,27 @@ def _reset():
 #####################
 
 def kill_coqtop():
-    CT.kill_coqtop()
+    bdata = buf_data[vim.current.buffer]
+    bdata['coqtop'].kill_coqtop()
     _reset()
 
 def goto_last_sent_dot():
-    (line, col) = (0,1) if encountered_dots == [] else encountered_dots[-1]
+    (line, col) = (0,1) if bdata['encountered_dots'] == [] else bdata['encountered_dots'][-1]
     vim.current.window.cursor = (line + 1, col)
 
 def coq_rewind(steps=1):
     clear_info()
 
-    global encountered_dots, info_msg
+    bdata = buf_data[vim.current.buffer]
 
-    if steps < 1 or encountered_dots == []:
+    if steps < 1 or bdata['encountered_dots'] == []:
         return
 
-    if CT.coqtop is None:
+    if bdata['coqtop'].coqtop is None:
         print("Error: Coqtop isn't running. Are you sure you called :CoqLaunch?")
         return
 
-    response = CT.rewind(steps)
+    response = bdata['coqtop'].rewind(steps)
 
     if response is None:
         vim.command("call coquille#KillSession()")
@@ -76,9 +79,9 @@ def coq_rewind(steps=1):
         return
 
     if isinstance(response, CT.Ok):
-        encountered_dots = encountered_dots[:len(encountered_dots) - steps]
+        bdata['encountered_dots'] = bdata['encountered_dots'][:len(bdata['encountered_dots']) - steps]
     else:
-        info_msg = "[COQUILLE ERROR] Unexpected answer:\n\n%s" % response
+        bdata['info_msg'] = "[COQUILLE ERROR] Unexpected answer:\n\n%s" % response
 
     refresh()
 
@@ -89,14 +92,16 @@ def coq_rewind(steps=1):
         goto_last_sent_dot()
 
 def coq_to_cursor():
-    if CT.coqtop is None:
+    bdata = buf_data[vim.current.buffer]
+
+    if bdata['coqtop'].coqtop is None:
         print("Error: Coqtop isn't running. Are you sure you called :CoqLaunch?")
         return
 
     sync()
 
     (cline, ccol) = vim.current.window.cursor
-    (line, col)  = encountered_dots[-1] if encountered_dots else (0,0)
+    (line, col)  = bdata['encountered_dots'][-1] if bdata['encountered_dots'] else (0,0)
 
     if cline < line or (cline == line and ccol < col):
         rewind_to(cline - 1, ccol)
@@ -106,25 +111,27 @@ def coq_to_cursor():
             if r is not None and r['stop'] <= (cline - 1, ccol):
                 line = r['stop'][0]
                 col  = r['stop'][1] + 1
-                send_queue.append(r)
+                bdata['send_queue'].append(r)
             else:
                 break
 
         send_until_fail()
 
 def coq_next():
-    if CT.coqtop is None:
+    bdata = buf_data[vim.current.buffer]
+
+    if bdata['coqtop'].coqtop is None:
         print("Error: Coqtop isn't running. Are you sure you called :CoqLaunch?")
         return
 
     sync()
 
-    (line, col)  = encountered_dots[-1] if encountered_dots else (0,0)
+    (line, col)  = bdata['encountered_dots'][-1] if bdata['encountered_dots'] else (0,0)
     message_range = _get_message_range((line, col))
 
     if message_range is None: return
 
-    send_queue.append(message_range)
+    bdata['send_queue'].append(message_range)
 
     send_until_fail()
 
@@ -134,8 +141,8 @@ def coq_next():
 def coq_raw_query(*args):
     clear_info()
 
-    global info_msg
-    if CT.coqtop is None:
+    bdata = buf_data[vim.current.buffer]
+    if bdata['coqtop'].coqtop is None:
         print("Error: Coqtop isn't running. Are you sure you called :CoqLaunch?")
         return
 
@@ -143,7 +150,7 @@ def coq_raw_query(*args):
 
     encoding = vim.eval("&encoding") or 'utf-8'
 
-    response = CT.query(raw_query, encoding)
+    response = bdata['coqtop'].query(raw_query, encoding)
 
     if response is None:
         vim.command("call coquille#KillSession()")
@@ -152,9 +159,9 @@ def coq_raw_query(*args):
 
     if isinstance(response, CT.Ok):
         if response.msg is not None:
-            info_msg = response.msg
+            bdata['info_msg'] = response.msg
     elif isinstance(response, CT.Err):
-        info_msg = response.err.text
+        bdata['info_msg'] = response.err.text
         print("FAIL")
     else:
         print("(ANOMALY) unknown answer: %s" % ET.tostring(response)) # ugly
@@ -163,12 +170,15 @@ def coq_raw_query(*args):
 
 
 def launch_coq(*args):
-    CT.restart_coq(*args)
+    bdata = buf_data[vim.current.buffer]
+    bdata['coqtop'] = CT.Coqtop()
+    bdata['coqtop'].restart_coq(*args)
 
 def debug():
-    if encountered_dots:
+    bdata = buf_data[vim.current.buffer]
+    if bdata['encountered_dots']:
         print("encountered dots = [")
-        for (line, col) in encountered_dots:
+        for (line, col) in bdata['encountered_dots']:
             print("  (%d, %d) ; " % (line, col))
         print("]")
 
@@ -182,16 +192,15 @@ def refresh():
     reset_color()
 
 def show_goal():
-    global info_msg
+    bdata = buf_data[vim.current.buffer]
 
     buff = None
-    for b in vim.buffers:
-        if re.match(".*Goals$", b.name):
-            buff = b
-            break
+    bufn = int(vim.eval('b:goal_buf'))
+    buff = vim.buffers[bufn]
+
     del buff[:]
 
-    response = CT.goals()
+    response = bdata['coqtop'].goals()
 
     if response is None:
         vim.command("call coquille#KillSession()")
@@ -199,7 +208,7 @@ def show_goal():
         return
 
     if response.msg is not None:
-        info_msg = response.msg
+        bdata['info_msg'] = response.msg
 
     if response.val.val is None:
         buff.append('No goals.')
@@ -228,27 +237,41 @@ def show_goal():
         buff.append(lines)
         buff.append('')
 
-def show_info():
-    global info_msg
+    bdata['goal_msg'] = '\n'.join(buff[:])
+
+def remem_goal():
+    bdata = buf_data[vim.current.buffer]
 
     buff = None
-    for b in vim.buffers:
-        if re.match(".*Infos$", b.name):
-            buff = b
-            break
+    bufn = int(vim.eval('b:goal_buf'))
+    buff = vim.buffers[bufn]
 
     del buff[:]
-    if info_msg is not None:
-        lst = info_msg.split('\n')
+    if bdata['goal_msg'] is not None:
+        lst = bdata['goal_msg'].split('\n')
+        buff.append(map(lambda s: s.encode('utf-8'), lst))
+    else:
+        buff.append('No goals.')
+
+def show_info():
+    bdata = buf_data[vim.current.buffer]
+
+    buff = None
+    bufn = int(vim.eval('b:info_buf'))
+    buff = vim.buffers[bufn]
+
+    del buff[:]
+    if bdata['info_msg'] is not None:
+        lst = bdata['info_msg'].split('\n')
         buff.append(map(lambda s: s.encode('utf-8'), lst))
 
 def clear_info():
-    global info_msg
-    info_msg = ''
+    bdata = buf_data[vim.current.buffer]
+    bdata['info_msg'] = ''
     show_info()
 
 def reset_color():
-    global error_at
+    bdata = buf_data[vim.current.buffer]
     # Clear current coloring (dirty)
     if int(vim.eval('b:checked')) != -1:
         vim.command('call matchdelete(b:checked)')
@@ -260,39 +283,54 @@ def reset_color():
         vim.command('call matchdelete(b:errors)')
         vim.command('let b:errors = -1')
     # Recolor
-    if encountered_dots:
-        (line, col) = encountered_dots[-1]
+    if bdata['encountered_dots']:
+        (line, col) = bdata['encountered_dots'][-1]
         start = { 'line': 0 , 'col': 0 }
         stop  = { 'line': line + 1, 'col': col }
         zone = _make_matcher(start, stop)
         vim.command("let b:checked = matchadd('CheckedByCoq', '%s')" % zone)
-    if len(send_queue) > 0:
-        (l, c) = encountered_dots[-1] if encountered_dots else (0,-1)
-        r = send_queue.pop()
-        send_queue.append(r)
+    if len(bdata['send_queue']) > 0:
+        (l, c) = bdata['encountered_dots'][-1] if bdata['encountered_dots'] else (0,-1)
+        r = bdata['send_queue'].pop()
+        bdata['send_queue'].append(r)
         (line, col) = r['stop']
         start = { 'line': l , 'col': c + 1 }
         stop  = { 'line': line + 1, 'col': col }
         zone = _make_matcher(start, stop)
         vim.command("let b:sent = matchadd('SentToCoq', '%s')" % zone)
-    if error_at:
-        ((sline, scol), (eline, ecol)) = error_at
+    if bdata['error_at']:
+        ((sline, scol), (eline, ecol)) = bdata['error_at']
         start = { 'line': sline + 1, 'col': scol }
         stop  = { 'line': eline + 1, 'col': ecol }
         zone = _make_matcher(start, stop)
         vim.command("let b:errors = matchadd('CoqError', '%s')" % zone)
-        error_at = None
+        bdata['error_at'] = None
+
+def hide_color():
+    bdata = buf_data[vim.current.buffer]
+    # Clear current coloring (dirty)
+    if int(vim.eval('b:checked')) != -1:
+        vim.command('call matchdelete(b:checked)')
+        vim.command('let b:checked = -1')
+    if int(vim.eval('b:sent')) != -1:
+        vim.command('call matchdelete(b:sent)')
+        vim.command('let b:sent = -1')
+    if int(vim.eval('b:errors')) != -1:
+        vim.command('call matchdelete(b:errors)')
+        vim.command('let b:errors = -1')
 
 def rewind_to(line, col):
-    if CT.coqtop is None:
+    bdata = buf_data[vim.current.buffer]
+
+    if bdata['coqtop'].coqtop is None:
         print('Internal error: vimbufsync is still being called but coqtop\
                 appears to be down.')
         print('Please report.')
         return
 
     predicate = lambda x: x <= (line, col)
-    lst = filter(predicate, encountered_dots)
-    steps = len(encountered_dots) - len(lst)
+    lst = filter(predicate, bdata['encountered_dots'])
+    steps = len(bdata['encountered_dots']) - len(lst)
     coq_rewind(steps)
 
 #############################
@@ -301,24 +339,24 @@ def rewind_to(line, col):
 
 def send_until_fail():
     """
-    Tries to send every message in [send_queue] to Coq, stops at the first
+    Tries to send every message in [bdata['send_queue']] to Coq, stops at the first
     error.
-    When this function returns, [send_queue] is empty.
+    When this function returns, [bdata['send_queue']] is empty.
     """
     clear_info()
 
-    global encountered_dots, error_at, info_msg
+    bdata = buf_data[vim.current.buffer]
 
     encoding = vim.eval('&fileencoding') or 'utf-8'
 
-    while len(send_queue) > 0:
+    while len(bdata['send_queue']) > 0:
         reset_color()
         vim.command('redraw')
 
-        message_range = send_queue.popleft()
+        message_range = bdata['send_queue'].popleft()
         message = _between(message_range['start'], message_range['stop'])
 
-        response = CT.advance(message, encoding)
+        response = bdata['coqtop'].advance(message, encoding)
 
         if response is None:
             vim.command("call coquille#KillSession()")
@@ -327,16 +365,16 @@ def send_until_fail():
 
         if isinstance(response, CT.Ok):
             (eline, ecol) = message_range['stop']
-            encountered_dots.append((eline, ecol + 1))
+            bdata['encountered_dots'].append((eline, ecol + 1))
 
             optionnal_info = response.val[1]
             if len(response.val) > 1 and isinstance(response.val[1], tuple):
-                info_msg = response.val[1][1]
+                bdata['info_msg'] = response.val[1][1]
         else:
-            send_queue.clear()
+            bdata['send_queue'].clear()
             if isinstance(response, CT.Err):
                 response = response.err
-                info_msg = response.text
+                bdata['info_msg'] = response.text
                 loc_s = response.get('loc_s')
                 if loc_s is not None:
                     loc_s = int(loc_s)
@@ -344,7 +382,7 @@ def send_until_fail():
                     (l, c) = message_range['start']
                     (l_start, c_start) = _pos_from_offset(c, message, loc_s)
                     (l_stop, c_stop)   = _pos_from_offset(c, message, loc_e)
-                    error_at = ((l + l_start, c_start), (l + l_stop, c_stop))
+                    bdata['error_at'] = ((l + l_start, c_start), (l + l_stop, c_stop))
             else:
                 print("(ANOMALY) unknown answer: %s" % ET.tostring(response))
             break
@@ -405,7 +443,7 @@ def _find_next_chunk(line, col):
 
     # Then we check if the first character of the chunk is a bullet.
     # Intially I did that only when I was sure to be in a proof (by looking in
-    # [encountered_dots] whether I was after a "collapsable" chunk or not), but
+    # [bdata['encountered_dots']] whether I was after a "collapsable" chunk or not), but
     #   1/ that didn't play well with coq_to_cursor (as the "collapsable chunk"
     #      might not have been sent/detected yet).
     #   2/ The bullet chars can never be used at the *beginning* of a chunk
@@ -429,7 +467,6 @@ def _find_next_chunk(line, col):
 def _find_dot_after(line, col):
     """
     Returns the position of the next "valid" dot after a certain position.
-    Valid here means: recognized by Coq as terminating an input, so dots in
     comments, strings or ident paths are not valid.
     """
     b = vim.current.buffer

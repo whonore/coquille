@@ -135,138 +135,137 @@ def encode_value(v):
     else:
         assert False, 'unrecognized type in encode_value: %r' % (type(v),)
 
-coqtop = None
-states = []
-state_id = None
-root_state = None
+class Coqtop(object):
+    def __init__(self):
+        self.coqtop = None
+        self.states = []
+        self.state_id = None
+        self.root_state = None
 
-def kill_coqtop():
-    global coqtop
-    if coqtop:
-        try:
-            coqtop.terminate()
-            coqtop.communicate()
-        except OSError:
-            pass
-        coqtop = None
-
-def ignore_sigint():
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-
-def escape(cmd):
-    return cmd.replace("&nbsp;", ' ') \
-              .replace("&apos;", '\'') \
-              .replace("&#40;", '(') \
-              .replace("&#41;", ')')
-
-def get_answer():
-    fd = coqtop.stdout.fileno()
-    messageNode = None
-    data = ''
-    while True:
-        try:
-            data += os.read(fd, 0x4000)
+    def kill_coqtop(self):
+        if self.coqtop:
             try:
-                elt = ET.fromstring('<coqtoproot>' + escape(data) + '</coqtoproot>')
-                shouldWait = True
-                valueNode = None
-                for c in elt:
-                    if c.tag == 'value':
-                        shouldWait = False
-                        valueNode = c
-                    if c.tag == 'message':
-                        messageNode = c[1]
-                if shouldWait:
+                self.coqtop.terminate()
+                self.coqtop.communicate()
+            except OSError:
+                pass
+            self.coqtop = None
+
+    def ignore_sigint(self):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    def escape(self, cmd):
+        return cmd.replace("&nbsp;", ' ') \
+                  .replace("&apos;", '\'') \
+                  .replace("&#40;", '(') \
+                  .replace("&#41;", ')')
+
+    def get_answer(self):
+        fd = self.coqtop.stdout.fileno()
+        messageNode = None
+        data = ''
+        while True:
+            try:
+                data += os.read(fd, 0x4000)
+                try:
+                    elt = ET.fromstring('<coqtoproot>' + self.escape(data) + '</coqtoproot>')
+                    shouldWait = True
+                    valueNode = None
+                    messageNode = None
+                    for c in elt:
+                        if c.tag == 'value':
+                            shouldWait = False
+                            valueNode = c
+                        if c.tag == 'message':
+                            messageNode = c[1]
+                    if shouldWait:
+                        continue
+                    else:
+                        vp = parse_response(valueNode)
+                        if messageNode is not None:
+                            if isinstance(vp, Ok):
+                                return Ok(vp.val, parse_value(messageNode).val)
+                        return vp
+                except ET.ParseError:
                     continue
-                else:
-                    vp = parse_response(valueNode)
-                    if messageNode is not None:
-                        if isinstance(vp, Ok):
-                            return Ok(vp.val, parse_value(messageNode).val)
-                    return vp
-            except ET.ParseError:
-                continue
+            except OSError:
+                # coqtop died
+                return None
+
+    def call(self, name, arg, encoding='utf-8'):
+        xml = encode_call(name, arg)
+        msg = ET.tostring(xml, encoding)
+        self.send_cmd(msg)
+        response = self.get_answer()
+        return response
+
+    def send_cmd(self, cmd):
+        self.coqtop.stdin.write(cmd)
+
+    def restart_coq(self, *args):
+        if self.coqtop: self.kill_coqtop()
+        options = [ 'coqtop'
+                  , '-ideslave'
+                  , '-main-channel'
+                  , 'stdfds'
+                  , '-async-proofs'
+                  , 'on'
+                  ]
+        try:
+            if os.name == 'nt':
+                self.coqtop = subprocess.Popen(
+                    options + list(args)
+                  , stdin = subprocess.PIPE
+                  , stdout = subprocess.PIPE
+                  , stderr = subprocess.STDOUT
+                )
+            else:
+                self.coqtop = subprocess.Popen(
+                    options + list(args)
+                  , stdin = subprocess.PIPE
+                  , stdout = subprocess.PIPE
+                  , preexec_fn = self.ignore_sigint
+                )
+
+            r = self.call('Init', Option(None))
+            assert isinstance(r, Ok)
+            self.root_state = r.val
+            self.state_id = r.val
         except OSError:
-            # coqtop died
-            return None
+            print("Error: couldn't launch coqtop")
 
-def call(name, arg, encoding='utf-8'):
-    xml = encode_call(name, arg)
-    msg = ET.tostring(xml, encoding)
-    send_cmd(msg)
-    response = get_answer()
-    return response
+    def launch_coq(self, *args):
+        self.restart_coq(*args)
 
-def send_cmd(cmd):
-    coqtop.stdin.write(cmd)
-
-def restart_coq(*args):
-    global coqtop, root_state, state_id
-    if coqtop: kill_coqtop()
-    options = [ 'coqtop'
-              , '-ideslave'
-              , '-main-channel'
-              , 'stdfds'
-              , '-async-proofs'
-              , 'on'
-              ]
-    try:
-        if os.name == 'nt':
-            coqtop = subprocess.Popen(
-                options + list(args)
-              , stdin = subprocess.PIPE
-              , stdout = subprocess.PIPE
-              , stderr = subprocess.STDOUT
-            )
+    def cur_state(self):
+        if len(self.states) == 0:
+            return self.root_state
         else:
-            coqtop = subprocess.Popen(
-                options + list(args)
-              , stdin = subprocess.PIPE
-              , stdout = subprocess.PIPE
-              , preexec_fn = ignore_sigint
-            )
+            return self.state_id
 
-        r = call('Init', Option(None))
-        assert isinstance(r, Ok)
-        root_state = r.val
-        state_id = r.val
-    except OSError:
-        print("Error: couldn't launch coqtop")
-
-def launch_coq(*args):
-    restart_coq(*args)
-
-def cur_state():
-    if len(states) == 0:
-        return root_state
-    else:
-        return state_id
-
-def advance(cmd, encoding = 'utf-8'):
-    global state_id
-    r = call('Add', ((cmd, -1), (cur_state(), True)), encoding)
-    if r is None:
+    def advance(self, cmd, encoding = 'utf-8'):
+        r = self.call('Add', ((cmd, -1), (self.cur_state(), True)), encoding)
+        if r is None:
+            return r
+        if isinstance(r, Err):
+            return r
+        self.states.append(self.state_id)
+        self.state_id = r.val[0]
         return r
-    if isinstance(r, Err):
+
+    def rewind(self, step = 1):
+        assert step <= len(self.states)
+        idx = len(self.states) - step
+        self.state_id = self.states[idx]
+        self.states = self.states[0:idx]
+        return self.call('Edit_at', self.state_id)
+
+    def query(self, cmd, encoding = 'utf-8'):
+        r = self.call('Query', (cmd, self.cur_state()), encoding)
         return r
-    states.append(state_id)
-    state_id = r.val[0]
-    return r
 
-def rewind(step = 1):
-    global states, state_id
-    assert step <= len(states)
-    idx = len(states) - step
-    state_id = states[idx]
-    states = states[0:idx]
-    return call('Edit_at', state_id)
+    def goals(self):
+        return self.call('Goal', ())
 
-def query(cmd, encoding = 'utf-8'):
-    r = call('Query', (cmd, cur_state()), encoding)
-    return r
-
-def goals():
-    return call('Goal', ())
-
-def read_states():
-    return states
+    def read_states(self):
+        return self.states

@@ -1,5 +1,5 @@
-let s:coq_running=0
-let s:current_dir=expand("<sfile>:p:h") 
+let s:current_dir=expand("<sfile>:p:h")
+let g:counter=0
 
 if !exists('coquille_auto_move')
     let g:coquille_auto_move="false"
@@ -10,33 +10,38 @@ call vimbufsync#init()
 
 py import sys, vim
 py if not vim.eval("s:current_dir") in sys.path:
-\    sys.path.append(vim.eval("s:current_dir")) 
+\    sys.path.append(vim.eval("s:current_dir"))
 py import coquille
 
 function! coquille#ShowPanels()
     " open the Goals & Infos panels before going back to the main window
     let l:winnb = winnr()
-    rightbelow vnew Goals
+    execute 'rightbelow vnew Goals' . g:counter
         setlocal buftype=nofile
         setlocal filetype=coq-goals
         setlocal noswapfile
-        let s:goal_buf = bufnr("%")
-    rightbelow new Infos
+        let l:goal_buf = bufnr("%")
+    execute 'rightbelow new Infos' . g:counter
         setlocal buftype=nofile
         setlocal filetype=coq-infos
         setlocal noswapfile
-        let s:info_buf = bufnr("%")
+        let l:info_buf = bufnr("%")
     execute l:winnb . 'winc w'
+    let b:goal_buf = l:goal_buf
+    let b:info_buf = l:info_buf
+    let g:counter += 1
 endfunction
 
 function! coquille#KillSession()
-    let s:coq_running = 0
+    if b:coq_running == 1
+        let b:coq_running = 0
 
-    execute 'bdelete' . s:goal_buf
-    execute 'bdelete' . s:info_buf
-    py coquille.kill_coqtop()
+        execute 'bdelete' . b:goal_buf
+        execute 'bdelete' . b:info_buf
+        py coquille.kill_coqtop()
 
-    setlocal ei=InsertEnter
+        setlocal ei=InsertEnter,BufEnter,BufLeave
+    endif
 endfunction
 
 function! coquille#RawQuery(...)
@@ -70,14 +75,40 @@ function! coquille#CoqideMapping()
     imap <buffer> <silent> <C-A-Right> <C-\><C-o>:CoqToCursor<CR>
 endfunction
 
+function! coquille#LeaderMapping()
+    map <buffer> <silent> <leader>cc :CoqLaunch<CR>
+    map <buffer> <silent> <leader>cq :CoqKill<CR>
+
+    map <buffer> <silent> <leader>cj :CoqNext<CR>
+    map <buffer> <silent> <leader>ck :CoqUndo<CR>
+    map <buffer> <silent> <leader>cl :CoqToCursor<CR>
+
+    imap <buffer> <silent> <leader>cj <C-\><C-o>:CoqNext<CR>
+    imap <buffer> <silent> <leader>ck <C-\><C-o>:CoqUndo<CR>
+    imap <buffer> <silent> <leader>cl <C-\><C-o>:CoqToCursor<CR>
+
+    map <buffer> <silent> <leader>c1 :Coq SearchAbout <C-r>=expand("<cword>")<CR>.<CR>
+    map <buffer> <silent> <leader>c2 :Coq Check <C-r>=expand("<cword>")<CR>.<CR>
+    map <buffer> <silent> <leader>c3 :Coq About <C-r>=expand("<cword>")<CR>.<CR>
+    map <buffer> <silent> <leader>c4 :Coq Print <C-r>=expand("<cword>")<CR>.<CR>
+    map <buffer> <silent> <leader>c5 :Coq About <C-r>=expand("<cword>")<CR>.<CR>
+    map <buffer> <silent> <leader>c6 :Coq Locate <C-r>=expand("<cword>")<CR>.<CR>
+endfunction
+
 function! coquille#Launch(...)
-    if s:coq_running == 1
+    if b:coq_running == 1
         echo "Coq is already running"
     else
-        let s:coq_running = 1
+        let b:coq_running = 1
+
+        if exists('g:coquille_args')
+            let extra_args = split(g:coquille_args)
+        else
+            let extra_args = []
+        endif
 
         " initialize the plugin (launch coqtop)
-        py coquille.launch_coq(*vim.eval("map(copy(a:000),'expand(v:val)')"))
+        py coquille.launch_coq(*vim.eval("map(copy(extra_args+a:000),'expand(v:val)')"))
 
         " make the different commands accessible
         command! -buffer GotoDot py coquille.goto_last_sent_dot()
@@ -98,17 +129,32 @@ function! coquille#Launch(...)
         " nothing really problematic will happen, as sync will be called the next
         " time you explicitly call a command (be it 'rewind' or 'interp')
         au InsertEnter <buffer> py coquille.sync()
+        au BufLeave <buffer> py coquille.hide_color()
+        au BufEnter <buffer> py coquille.reset_color(); coquille.remem_goal()
     endif
-endfunction
+endfunction"
 
 function! coquille#Register()
     hi default CheckedByCoq ctermbg=17 guibg=LightGreen
     hi default SentToCoq ctermbg=60 guibg=LimeGreen
     hi link CoqError Error
 
-    let b:checked = -1
-    let b:sent    = -1
-    let b:errors  = -1
+    if !exists('b:coq_running')
+        let b:coq_running = 0
+        let b:checked = -1
+        let b:sent    = -1
+        let b:errors  = -1
+    else
+        let l:winnb = winnr()
+        only
+        if exists('b:goal_buf')
+            let l:goal_buf = b:goal_buf
+            let l:info_buf = b:info_buf
+            execute 'rightbelow vertical sbuffer ' . l:goal_buf
+            execute 'rightbelow sbuffer ' . l:info_buf
+            execute l:winnb . 'wincmd w'
+        endif
+    endif
 
     command! -bar -buffer -nargs=* -complete=file CoqLaunch call coquille#Launch(<f-args>)
 endfunction
