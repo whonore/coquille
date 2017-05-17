@@ -340,24 +340,24 @@ def parse_locate(msg):
     ltype = msg[0]
 
     if ltype == 'No':
-        return None, '', ''
+        return None, '', None
 
     where = msg[1].split('.')
     if where[0] == 'Coq':
-        return 'Coq', '', ''
+        return 'Coq', '', None
     elif where[0] == 'Top':
         lfile = vim.eval("expand('%:p')")
-        return ltype, lfile, where[-1]
+        return ltype, 'Top', where[-1]
     else:
         if ltype == 'Module':
             lfile = os.path.abspath(os.path.join(*where)) + '.v'
-            lname = ''
+            lname = None
         else:
             lfile = os.path.abspath(os.path.join(*where[:-1])) + '.v'
             lname = where[-1]
         return ltype, lfile, lname
 
-    return 'Err', ' '.join(msg), ''
+    return 'Err', ' '.join(msg), None
 
 def coq_goto(target):
     bdata = buf_data[vim.current.buffer]
@@ -388,9 +388,9 @@ def coq_goto(target):
                 print('Unrecognized response from Locate:')
                 print(lfile)
             else:
-                print(ltype, lfile, lname)
-                vim.command('argadd ' + lfile)
-                vim.command('hide next')
+                if lfile != 'Top':
+                    print('here', ltype)
+                    vim.command('hide argedit ' + lfile)
                 if lname is not None:
                     vim.command('0/' + lname)
 

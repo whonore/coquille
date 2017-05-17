@@ -55,8 +55,8 @@ function! coquille#KillSession()
         Py coquille.kill_coqtop()
 
         au! InsertEnter <buffer>
-        au! BufEnter <buffer>
-        au! BufLeave <buffer>
+        au! BufWinEnter <buffer>
+        au! BufWinLeave <buffer>
 
         unlet b:goal_buf b:info_buf
     endif
@@ -168,10 +168,10 @@ function! coquille#Launch(...)
         " nothing really problematic will happen, as sync will be called the next
         " time you explicitly call a command (be it 'rewind' or 'interp')
         au InsertEnter <buffer> Py coquille.sync()
-        au BufLeave <buffer> only
-        au BufLeave <buffer> Py coquille.hide_color()
-        au BufEnter <buffer> call coquille#RestorePanels()
-        au BufEnter <buffer> Py coquille.reset_color(); coquille.remem_goal()
+        au BufWinLeave <buffer> only
+        au BufWinLeave <buffer> Py coquille.hide_color()
+        au BufWinEnter <buffer> call coquille#RestorePanels()
+        au BufWinEnter <buffer> Py coquille.reset_color(); coquille.remem_goal()
     endif
 endfunction"
 
