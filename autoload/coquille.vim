@@ -1,4 +1,17 @@
-let s:current_dir = expand("<sfile>:p:h") "TODO: probably needs to be b: variable too
+" Only source once
+if exists('g:coquille_sourced')
+    finish
+endif
+let g:coquille_sourced = 1
+
+" TODO: add support for py3
+if g:pyv != 2
+    echo "Coquille requires python2 support"
+    finish
+endif
+
+" TODO: should be s: variable, but since Py command is in .vimrc it doesn't see it
+let g:coquille#current_dir = expand("<sfile>:p:h")
 let g:counter = 0
 let g:proj_file = '_CoqProject'
 
@@ -9,10 +22,11 @@ endif
 " Load vimbufsync if not already done
 call vimbufsync#init()
 
-py import sys, vim
-py if not vim.eval("s:current_dir") in sys.path:
-\    sys.path.append(vim.eval("s:current_dir"))
-py import coquille
+Py import sys, vim
+Py if not vim.eval("g:coquille#current_dir") in sys.path:
+\    sys.path.append(vim.eval("g:coquille#current_dir"))
+Py print(sys.path)
+Py import coquille
 
 function! coquille#ShowPanels()
     " open the Goals & Infos panels before going back to the main window
@@ -39,14 +53,14 @@ function! coquille#KillSession()
 
         execute 'bdelete' . b:goal_buf
         execute 'bdelete' . b:info_buf
-        py coquille.kill_coqtop()
+        Py coquille.kill_coqtop()
 
         setlocal ei=InsertEnter,BufEnter,BufLeave
     endif
 endfunction
 
 function! coquille#RawQuery(...)
-    py coquille.coq_raw_query(*vim.eval("a:000"))
+    Py coquille.coq_raw_query(*vim.eval("a:000"))
 endfunction
 
 function! coquille#FNMapping()
@@ -117,13 +131,13 @@ function! coquille#Launch(...)
         let extra_args = proj_args + coq_args
 
         " initialize the plugin (launch coqtop)
-        py coquille.launch_coq(*vim.eval("map(copy(extra_args+a:000),'expand(v:val)')"))
+        Py coquille.launch_coq(*vim.eval("map(copy(extra_args+a:000),'expand(v:val)')"))
 
         " make the different commands accessible
-        command! -buffer GotoDot py coquille.goto_last_sent_dot()
-        command! -buffer CoqNext py coquille.coq_next()
-        command! -buffer CoqUndo py coquille.coq_rewind()
-        command! -buffer CoqToCursor py coquille.coq_to_cursor()
+        command! -buffer GotoDot Py coquille.goto_last_sent_dot()
+        command! -buffer CoqNext Py coquille.coq_next()
+        command! -buffer CoqUndo Py coquille.coq_rewind()
+        command! -buffer CoqToCursor Py coquille.coq_to_cursor()
         command! -buffer CoqKill call coquille#KillSession()
 
         command! -buffer -nargs=* Coq call coquille#RawQuery(<f-args>)
@@ -137,9 +151,9 @@ function! coquille#Launch(...)
         " delete some part of your buffer. So the highlighting will be wrong, but
         " nothing really problematic will happen, as sync will be called the next
         " time you explicitly call a command (be it 'rewind' or 'interp')
-        au InsertEnter <buffer> py coquille.sync()
-        au BufLeave <buffer> py coquille.hide_color()
-        au BufEnter <buffer> py coquille.reset_color(); coquille.remem_goal()
+        au InsertEnter <buffer> Py coquille.sync()
+        au BufLeave <buffer> Py coquille.hide_color()
+        au BufEnter <buffer> Py coquille.reset_color(); coquille.remem_goal()
     endif
 endfunction"
 
