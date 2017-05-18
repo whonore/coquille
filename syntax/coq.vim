@@ -13,9 +13,9 @@
 "              2007 Nov 17 - Various minor bugfixes.
 "              2007 Nov 8 - Added keywords.
 "              2007 Nov 8 - Fixed some ill-highlighting in the type of declarations.
-"              2007 Nov 8 - Fixed pb with keywords ("\<...\>" had been forgotten) 
+"              2007 Nov 8 - Fixed pb with keywords ("\<...\>" had been forgotten)
 "                           (thanks to Vasileios Koutavas)
-"              2007 Nov 8 - Definition...Defined now works as expected, 
+"              2007 Nov 8 - Definition...Defined now works as expected,
 "                           fixed a bug with tactics that were not recognized,
 "                           fixed other bugs
 "              2007 Nov 7 - Complete refactoring, (much) more accurate highlighting. Much bigger file...
@@ -36,7 +36,7 @@ endif
 " Coq is case sensitive.
 syn case match
 
-syn cluster coqVernac contains=coqRequire,coqCheck,coqEval,coqNotation,coqTacNotation,coqDecl,coqThm,coqLtacDecl,coqDef,coqFix,coqInd,coqRec,coqShow
+syn cluster coqVernac contains=coqRequire,coqCheck,coqEval,coqNotation,coqTacNotation,coqDecl,coqThm,coqLtacDecl,coqDef,coqFix,coqInd,coqRec,coqCls,coqIns,coqShow
 
 " Various
 syn match   coqError             "\S\+"
@@ -190,8 +190,8 @@ syn region coqTacNotationTerm contained contains=coqString,coqTactic,coqTacticKw
 syn keyword coqTacNotationKwd contained ident simple_intropattern hyp reference constr integer int_or_var tactic
 syn match   coqTacNotationKwd contained "at level"
 
-" Declarations 
-syn region coqDecl       contains=coqIdent,coqDeclTerm,coqDeclBinder matchgroup=coqVernacCmd start="\<\%(Axiom\|Conjecture\|Hypothes[ie]s\|Parameters\?\|Variables\?\)\>" matchgroup=coqVernacCmd end="\.\_s" keepend
+" Declarations
+syn region coqDecl       contains=coqIdent,coqDeclTerm,coqDeclBinder matchgroup=coqVernacCmd start="\<\%(Axiom\|Conjecture\|Hypothes[ie]s\|Parameters\?\|Variables\?\|Context\)\>" matchgroup=coqVernacCmd end="\.\_s" keepend
 syn region coqDeclBinder contained contains=coqIdent,coqDeclTerm matchgroup=coqVernacPunctuation start="(" end=")" keepend
 syn region coqDeclTerm   contained contains=@coqTerm matchgroup=coqVernacPunctuation start=":" end=")"
 syn region coqDeclTerm   contained contains=@coqTerm matchgroup=coqVernacPunctuation start=":" end="\.\_s"
@@ -226,12 +226,12 @@ syn region coqProofEnder contained contains=coqIdent matchgroup=coqProofDelim st
 syn keyword coqTactic    contained absurd apply assert assumption auto
 syn keyword coqTactic    contained case[_eq] change clear[body] cofix cbv compare compute congruence constructor contradiction cut[rewrite]
 syn keyword coqTactic    contained decide decompose dependent destruct discriminate double
-syn keyword coqTactic    contained eapply eassumption econstructor elim[type] equality evar exact eexact exists exfalso
+syn keyword coqTactic    contained eapply eassumption eauto econstructor elim[type] equality erewrite evar exact eexact exists eexists exfalso
 syn keyword coqTactic    contained fix f_equal fold functional generalize hnf
 syn keyword coqTactic    contained idtac induction injection instantiate intro[s] intuition inversion[_clear]
 syn keyword coqTactic    contained lapply left move omega pattern pose proof quote
 syn keyword coqTactic    contained red refine reflexivity rename replace revert rewrite right ring
-syn keyword coqTactic    contained set simpl[e] simplify_eq split subst stepl stepr symmetry
+syn keyword coqTactic    contained set simpl[e] simplify_eq specialize split subst stepl stepr symmetry
 syn keyword coqTactic    contained transitivity trivial unfold vm_compute
 syn keyword coqTacticKwd contained as by in using with into after until return
 
@@ -286,6 +286,12 @@ syn region coqRecStart   contained contains=coqRecField,@coqTerm start="{" match
 syn region coqRecField   contained contains=coqField matchgroup=coqVernacPunctuation start="{" end=":"
 syn region coqRecField   contained contains=coqField matchgroup=coqVernacPunctuation start=";" end=":"
 syn match coqField       contained "[_[:alpha:]][_'[:alnum:]]*"
+
+" Typeclasses
+syn region coqCls contains=coqRecProfile start="\<Class\>" matchgroup=coqVernacPunctuation end="\.\_s" keepend
+
+" Typeclass instances
+syn region coqIns contains=coqDefName matchgroup=coqVernacCmd start="\<\%(\%(Global\|Local\)\_s\+\)\?Instance\>" matchgroup=coqVernacPunctuation end=":="me=e-2 end="\.$"me=e-1 end="\.\s"me=e-2 nextgroup=coqDefContents1,coqProofBody keepend skipnl skipwhite skipempty
 
 " Various (High priority)
 syn region  coqComment           containedin=ALL contains=coqComment,coqTodo start="(\*" end="\*)" extend keepend
