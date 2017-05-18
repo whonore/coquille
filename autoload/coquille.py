@@ -27,7 +27,7 @@ buf_data = ddict(lambda:
 # synchronization #
 ###################
 
-def sync():
+def sync(clear=True):
     bdata = buf_data[vim.current.buffer]
 
     curr_sync = vimbufsync.sync()
@@ -35,7 +35,7 @@ def sync():
         _reset()
     else:
         (line, col) = bdata['saved_sync'].pos()
-        rewind_to(line - 1, col) # vim indexes from lines 1, coquille from 0
+        rewind_to(line - 1, col, clear) # vim indexes from lines 1, coquille from 0
     bdata['saved_sync'] = curr_sync
 
 def _reset():
@@ -120,14 +120,14 @@ def coq_to_cursor():
 
         send_until_fail()
 
-def coq_next():
+def coq_next(clear=True):
     bdata = buf_data[vim.current.buffer]
 
     if bdata['coqtop'].coqtop is None:
         print("Error: Coqtop isn't running. Are you sure you called :CoqLaunch?")
         return
 
-    sync()
+    sync(clear)
 
     (line, col)  = bdata['encountered_dots'][-1] if bdata['encountered_dots'] else (0,0)
     message_range = _get_message_range((line, col))
@@ -136,7 +136,7 @@ def coq_next():
 
     bdata['send_queue'].append(message_range)
 
-    send_until_fail()
+    send_until_fail(clear)
 
     if (vim.eval('g:coquille_auto_move') == 'true'):
         goto_last_sent_dot()
@@ -203,8 +203,11 @@ def show_goal():
 
     response = bdata['coqtop'].goals()
 
+    # Kind of hacky, step back and forward to get the goal again
     if isinstance(response, CT.Err):
         bdata['info_msg'] = ''.join(response.err.itertext())
+        coq_rewind(1, False)
+        coq_next(False)
         return
 
     if response is None:
@@ -253,7 +256,7 @@ def remem_goal():
     del buff[:]
     if bdata['goal_msg'] is not None:
         lst = bdata['goal_msg'].split('\n')
-        buff.append(map(lambda s: s.encode('utf-8'), lst))
+        buff.append(lst)
     else:
         buff.append('No goals.')
 
@@ -322,7 +325,7 @@ def hide_color():
         vim.command('call matchdelete(b:errors)')
         vim.command('let b:errors = -1')
 
-def rewind_to(line, col):
+def rewind_to(line, col, clear=True):
     bdata = buf_data[vim.current.buffer]
 
     if bdata['coqtop'].coqtop is None:
@@ -334,7 +337,7 @@ def rewind_to(line, col):
     predicate = lambda x: x <= (line, col)
     lst = filter(predicate, bdata['encountered_dots'])
     steps = len(bdata['encountered_dots']) - len(lst)
-    coq_rewind(steps)
+    coq_rewind(steps, clear)
 
 # TODO: handle case with multiple matches
 def parse_locate(msg):
@@ -403,13 +406,14 @@ def coq_goto(target):
 # Communication with Coqtop #
 #############################
 
-def send_until_fail():
+def send_until_fail(clear=True):
     """
     Tries to send every message in [bdata['send_queue']] to Coq, stops at the first
     error.
     When this function returns, [bdata['send_queue']] is empty.
     """
-    clear_info()
+    if clear:
+        clear_info()
 
     bdata = buf_data[vim.current.buffer]
 
@@ -434,13 +438,14 @@ def send_until_fail():
             bdata['encountered_dots'].append((eline, ecol + 1))
 
             optionnal_info = response.val[1]
-            if len(response.val) > 1 and isinstance(response.val[1], tuple):
+            if clear and len(response.val) > 1 and isinstance(response.val[1], tuple):
                 bdata['info_msg'] = response.val[1][1]
         else:
             bdata['send_queue'].clear()
             if isinstance(response, CT.Err):
                 response = response.err
-                bdata['info_msg'] = ''.join(response.itertext())
+                if clear:
+                    bdata['info_msg'] = ''.join(response.itertext())
                 loc_s = response.get('loc_s')
                 if loc_s is not None:
                     loc_s = int(loc_s)
