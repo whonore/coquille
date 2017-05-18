@@ -113,6 +113,8 @@ function! coquille#LeaderMapping()
     map <silent> <leader>cf :Coq Locate <C-r>=expand("<cword>")<CR>.<CR>
 
     map <silent> <leader>co :CoqGoTo <C-r>=expand("<cword>")<CR><CR>
+
+    " TODO: jump to end of checked
 endfunction
 
 function! coquille#RestorePanels()
@@ -167,6 +169,7 @@ function! coquille#Launch(...)
         " delete some part of your buffer. So the highlighting will be wrong, but
         " nothing really problematic will happen, as sync will be called the next
         " time you explicitly call a command (be it 'rewind' or 'interp')
+        " TODO: fix switching args while in info or goal buffer
         au InsertEnter <buffer> Py coquille.sync()
         au BufWinLeave <buffer> only
         au BufWinLeave <buffer> Py coquille.hide_color()

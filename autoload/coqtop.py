@@ -29,7 +29,7 @@ def parse_response(xml):
     if xml.get('val') == 'good':
         return Ok(parse_value(xml[0]), None)
     elif xml.get('val') == 'fail':
-        print('err: %s' % ET.tostring(xml))
+        #print('err: %s' % ET.tostring(xml))
         return Err(parse_error(xml))
     else:
         assert False, 'expected "good" or "fail" in <value>'
@@ -86,7 +86,11 @@ def parse_value(xml):
         return ''.join(xml.itertext())
 
 def parse_error(xml):
-    return ET.fromstring(re.sub(r"<state_id val=\"\d+\" />", '', ET.tostring(xml)))
+    richpp = xml.find('richpp/_')
+    if richpp is None:
+        print('ERR: no richpp')
+        return ET.fromstring(re.sub(r"<state_id val=\"\d+\" />", '', ET.tostring(xml)))
+    return richpp
 
 def build(tag, val=None, children=()):
     attribs = {'val': val} if val is not None else {}

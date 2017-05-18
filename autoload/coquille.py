@@ -162,13 +162,11 @@ def coq_raw_query(*args):
         if response.msg is not None:
             bdata['info_msg'] = response.msg
     elif isinstance(response, CT.Err):
-        bdata['info_msg'] = response.err.text
-        print("FAIL")
+        bdata['info_msg'] = ''.join(response.err.itertext())
     else:
         print("(ANOMALY) unknown answer: %s" % ET.tostring(response)) # ugly
 
     show_info()
-
 
 def launch_coq(*args):
     bdata = buf_data[vim.current.buffer]
@@ -202,6 +200,11 @@ def show_goal():
     del buff[:]
 
     response = bdata['coqtop'].goals()
+
+    if isinstance(response, CT.Err):
+        bdata['info_msg'] = ''.join(response.err.itertext())
+        #remem_goal()
+        return
 
     if response is None:
         vim.command("call coquille#KillSession()")
@@ -243,7 +246,6 @@ def show_goal():
 def remem_goal():
     bdata = buf_data[vim.current.buffer]
 
-    buff = None
     bufn = int(vim.eval('b:goal_buf'))
     buff = vim.buffers[bufn]
 
@@ -257,7 +259,6 @@ def remem_goal():
 def show_info():
     bdata = buf_data[vim.current.buffer]
 
-    buff = None
     bufn = int(vim.eval('b:info_buf'))
     buff = vim.buffers[bufn]
 
@@ -389,13 +390,11 @@ def coq_goto(target):
                 print(lfile)
             else:
                 if lfile != 'Top':
-                    print('here', ltype)
                     vim.command('hide argedit ' + lfile)
                 if lname is not None:
                     vim.command('0/' + lname)
-
     elif isinstance(response, CT.Err):
-        print(response.err.text)
+        print(''.join(response.err.itertext()))
     else:
         print("(ANOMALY) unknown answer: %s" % ET.tostring(response)) # ugly
 
@@ -440,7 +439,7 @@ def send_until_fail():
             bdata['send_queue'].clear()
             if isinstance(response, CT.Err):
                 response = response.err
-                bdata['info_msg'] = response.text
+                bdata['info_msg'] = ''.join(response.itertext())
                 loc_s = response.get('loc_s')
                 if loc_s is not None:
                     loc_s = int(loc_s)
