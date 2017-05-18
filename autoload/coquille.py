@@ -57,11 +57,13 @@ def kill_coqtop():
     _reset()
 
 def goto_last_sent_dot():
+    bdata = buf_data[vim.current.buffer]
     (line, col) = (0,1) if bdata['encountered_dots'] == [] else bdata['encountered_dots'][-1]
     vim.current.window.cursor = (line + 1, col)
 
-def coq_rewind(steps=1):
-    clear_info()
+def coq_rewind(steps=1, clear=True):
+    if clear:
+        clear_info()
 
     bdata = buf_data[vim.current.buffer]
 
@@ -203,7 +205,6 @@ def show_goal():
 
     if isinstance(response, CT.Err):
         bdata['info_msg'] = ''.join(response.err.itertext())
-        #remem_goal()
         return
 
     if response is None:

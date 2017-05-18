@@ -105,6 +105,8 @@ function! coquille#LeaderMapping()
     imap <silent> <leader>ck <C-\><C-o>:CoqUndo<CR>
     imap <silent> <leader>cl <C-\><C-o>:CoqToCursor<CR>
 
+    map <silent> <leader>cG :GotoDot<CR>
+
     " TODO: recognize qualified (with '.') names as well
     map <silent> <leader>cs :Coq SearchAbout <C-r>=expand("<cword>")<CR>.<CR>
     map <silent> <leader>ch :Coq Check <C-r>=expand("<cword>")<CR>.<CR>
@@ -113,8 +115,6 @@ function! coquille#LeaderMapping()
     map <silent> <leader>cf :Coq Locate <C-r>=expand("<cword>")<CR>.<CR>
 
     map <silent> <leader>co :CoqGoTo <C-r>=expand("<cword>")<CR><CR>
-
-    " TODO: jump to end of checked
 endfunction
 
 function! coquille#RestorePanels()

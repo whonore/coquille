@@ -226,12 +226,15 @@ class Coqtop(object):
                   , stderr = subprocess.STDOUT
                 )
             else:
-                self.coqtop = subprocess.Popen(
-                    options + list(args)
-                  , stdin = subprocess.PIPE
-                  , stdout = subprocess.PIPE
-                  , preexec_fn = self.ignore_sigint
-                )
+                with open(os.devnull, 'w') as f:
+                    self.coqtop = subprocess.Popen(
+                            options + list(args)
+                            , stdin = subprocess.PIPE
+                            , stdout = subprocess.PIPE
+                            , stderr = f
+                            , preexec_fn = self.ignore_sigint
+                            )
+                    self.coqtop.stderr = None
 
             r = self.call('Init', Option(None))
             assert isinstance(r, Ok)
@@ -255,6 +258,9 @@ class Coqtop(object):
             return r
         if isinstance(r, Err):
             return r
+        g = self.goals()
+        if isinstance(g, Err):
+            return g
         self.states.append(self.state_id)
         self.state_id = r.val[0]
         return r
