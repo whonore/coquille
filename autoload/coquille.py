@@ -339,30 +339,58 @@ def rewind_to(line, col, clear=True):
     steps = len(bdata['encountered_dots']) - len(lst)
     coq_rewind(steps, clear)
 
-# TODO: handle case with multiple matches
 def parse_locate(msg):
-    msg = msg.split()
-    ltype = msg[0]
+    bdata = buf_data[vim.current.buffer]
 
-    if ltype == 'No':
-        return None, '', None
+    raw_query = 'Print LoadPath.'
+    encoding = vim.eval("&encoding") or 'utf-8'
+    response = bdata['coqtop'].query(raw_query, encoding)
 
-    where = msg[1].split('.')
-    if where[0] == 'Coq':
-        return 'Coq', '', None
-    elif where[0] == 'Top':
-        lfile = vim.eval("expand('%:p')")
-        return ltype, 'Top', where[-1]
+    if response is None:
+        vim.command("call coquille#KillSession()")
+        print('ERROR: the Coq process died')
+        return
+
+    if isinstance(response, CT.Ok):
+        paths = response.msg.split()[2:]
+        logic = paths[::2]
+        physic = paths[1::2]
+        path_map = {log: phy for log, phy in zip(logic, physic)}
     else:
-        if ltype == 'Module':
-            lfile = os.path.abspath(os.path.join(*where)) + '.v'
-            lname = None
-        else:
-            lfile = os.path.abspath(os.path.join(*where[:-1])) + '.v'
-            lname = where[-1]
-        return ltype, lfile, lname
+        return [('Err', 'Failed to query LoadPath', None)]
 
-    return 'Err', ' '.join(msg), None
+    locs = []
+    for loc in msg.split('\n'):
+        if loc.strip().startswith('('):
+            continue
+        loc = loc.split()
+        ltype = loc[0]
+
+        if ltype == 'No':
+            locs.append((None, '', None))
+            break
+
+        where = loc[1].split('.')
+        if where[0] == 'Coq':
+            locs.append((ltype, 'Coq', None))
+        elif where[0] == 'Top' or ltype == 'Variable':
+            lfile = vim.eval("expand('%:p')")
+            locs.append((ltype, 'Top', where[-1]))
+        else:
+            if ltype == 'Module':
+                libpath = path_map['.'.join(where[:-1])]
+                lfile = os.path.abspath(os.path.join(libpath, where[-1])) + '.v'
+                lname = None
+            else:
+                libpath = path_map['.'.join(where[:-2])]
+                lfile = os.path.abspath(os.path.join(libpath, where[-2])) + '.v'
+                lname = where[-1]
+            locs.append((ltype, lfile, lname))
+
+    if len(locs) == 0:
+        return [('Err', msg, None)]
+    else:
+        return locs
 
 def coq_goto(target):
     bdata = buf_data[vim.current.buffer]
@@ -371,9 +399,7 @@ def coq_goto(target):
         return
 
     raw_query = 'Locate ' + target + '.'
-
     encoding = vim.eval("&encoding") or 'utf-8'
-
     response = bdata['coqtop'].query(raw_query, encoding)
 
     if response is None:
@@ -383,12 +409,26 @@ def coq_goto(target):
 
     if isinstance(response, CT.Ok):
         if response.msg is not None:
-            ltype, lfile, lname = parse_locate(response.msg)
+            locs = parse_locate(response.msg)
+
+            if len(locs) == 1:
+                ltype, lfile, lname = locs[0]
+            else:
+                options = [str(n + 1) + ': ' + ltype + ' in ' + (lfile if lfile != 'Coq' else 'Coq stdlib')
+                           for n, (ltype, lfile, _) in enumerate(locs)
+                           if ltype is not None]
+                options.insert(0, 'Choose one of these definitions:')
+                idx = int(vim.eval('inputlist(' + str(options) + ')'))
+                if 1 <= idx <= len(locs):
+                    ltype, lfile, lname = locs[idx - 1]
+                else:
+                    print('Invalid choice')
+                    return
 
             if ltype is None:
                 print(response.msg)
-            elif ltype == 'Coq':
-                print('Part of coq stdlib')
+            elif lfile == 'Coq':
+                print('Part of Coq stdlib')
             elif ltype == 'Err':
                 print('Unrecognized response from Locate:')
                 print(lfile)
@@ -396,7 +436,23 @@ def coq_goto(target):
                 if lfile != 'Top':
                     vim.command('hide argedit ' + lfile)
                 if lname is not None:
-                    vim.command('0/' + lname)
+                    if ltype == 'Inductive':
+                        search = '(Inductive|Class|Record)'
+                    elif ltype == 'Constant':
+                        search = '(Definition|Fixpoint|Function|Instance|Fact|Remark|Lemma|Corollary|Theorem)'
+                    elif ltype == 'Notation':
+                        search = '(Notation)'
+                    elif ltype == 'Variable':
+                        search = '(Variables?|Context)'
+                    elif ltype == 'Ltac':
+                        search = '(Ltac)'
+                    else:
+                        search = ''
+
+                    try:
+                        vim.command(r"0/\v<{}>\s*<{}>".format(search, lname))
+                    except vim.error:
+                        vim.command(r"0/\v<{}>".format(lname))
     elif isinstance(response, CT.Err):
         print(''.join(response.err.itertext()))
     else:
