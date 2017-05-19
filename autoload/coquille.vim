@@ -93,6 +93,17 @@ function! coquille#CoqideMapping()
     imap <buffer> <silent> <C-A-Right> <C-\><C-o>:CoqToCursor<CR>
 endfunction
 
+function! coquille#GetCurWord()
+    setlocal iskeyword+=.
+    let l:cword = expand("<cword>")
+    if l:cword =~ ".*[.]$"
+       let l:cword = l:cword[:-2]
+    endif
+    setlocal iskeyword-=.
+
+    return l:cword
+endfunction
+
 function! coquille#LeaderMapping()
     map <silent> <leader>cc :CoqLaunch<CR>
     map <silent> <leader>cq :CoqKill<CR>
@@ -107,14 +118,13 @@ function! coquille#LeaderMapping()
 
     map <silent> <leader>cG :GotoDot<CR>
 
-    " TODO: recognize qualified (with '.') names as well
-    map <silent> <leader>cs :Coq SearchAbout <C-r>=expand("<cword>")<CR>.<CR>
-    map <silent> <leader>ch :Coq Check <C-r>=expand("<cword>")<CR>.<CR>
-    map <silent> <leader>ca :Coq About <C-r>=expand("<cword>")<CR>.<CR>
-    map <silent> <leader>cp :Coq Print <C-r>=expand("<cword>")<CR>.<CR>
-    map <silent> <leader>cf :Coq Locate <C-r>=expand("<cword>")<CR>.<CR>
+    map <silent> <leader>cs :Coq SearchAbout <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
+    map <silent> <leader>ch :Coq Check <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
+    map <silent> <leader>ca :Coq About <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
+    map <silent> <leader>cp :Coq Print <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
+    map <silent> <leader>cf :Coq Locate <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
 
-    map <silent> <leader>co :CoqGoTo <C-r>=expand("<cword>")<CR><CR>
+    map <silent> <leader>co :CoqGoTo <C-r>=expand(coquille#GetCurWord())<CR><CR>
 endfunction
 
 function! coquille#RestorePanels()
@@ -133,21 +143,21 @@ function! coquille#Launch(...)
         let b:coq_running = 1
 
         if filereadable(g:proj_file)
-            let proj_args = split(join(readfile(g:proj_file)))
+            let l:proj_args = split(join(readfile(g:proj_file)))
         else
-            let proj_args = []
+            let l:proj_args = []
         endif
 
         if exists('g:coquille_args')
-            let coq_args = split(g:coquille_args)
+            let l:coq_args = split(g:coquille_args)
         else
-            let coq_args = []
+            let l:coq_args = []
         endif
 
-        let extra_args = proj_args + coq_args
+        let l:extra_args = l:proj_args + l:coq_args
 
         " initialize the plugin (launch coqtop)
-        Py coquille.launch_coq(*vim.eval("map(copy(extra_args+a:000),'expand(v:val)')"))
+        Py coquille.launch_coq(*vim.eval("map(copy(l:extra_args+a:000),'expand(v:val)')"))
 
         " make the different commands accessible
         command! -buffer GotoDot Py coquille.goto_last_sent_dot()

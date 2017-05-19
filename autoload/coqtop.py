@@ -226,12 +226,12 @@ class Coqtop(object):
                   , stderr = subprocess.STDOUT
                 )
             else:
-                with open(os.devnull, 'w') as f:
+                with open(os.devnull, 'w') as null:
                     self.coqtop = subprocess.Popen(
                             options + list(args)
                             , stdin = subprocess.PIPE
                             , stdout = subprocess.PIPE
-                            , stderr = f
+                            , stderr = null
                             , preexec_fn = self.ignore_sigint
                             )
                     self.coqtop.stderr = None
