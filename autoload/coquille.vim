@@ -54,9 +54,7 @@ function! coquille#KillSession()
         execute 'bdelete' . b:info_buf
         Py coquille.kill_coqtop()
 
-        au! InsertEnter <buffer>
-        au! BufWinEnter <buffer>
-        au! BufWinLeave <buffer>
+        au! coquille#Main * <buffer>
 
         unlet b:goal_buf b:info_buf
     endif
@@ -64,33 +62,6 @@ endfunction
 
 function! coquille#RawQuery(...)
     Py coquille.coq_raw_query(*vim.eval("a:000"))
-endfunction
-
-function! coquille#FNMapping()
-    "" --- Function keys bindings
-    "" Works under all tested config.
-    map <buffer> <silent> <F2> :CoqUndo<CR>
-    map <buffer> <silent> <F3> :CoqNext<CR>
-    map <buffer> <silent> <F4> :CoqToCursor<CR>
-
-    imap <buffer> <silent> <F2> <C-\><C-o>:CoqUndo<CR>
-    imap <buffer> <silent> <F3> <C-\><C-o>:CoqNext<CR>
-    imap <buffer> <silent> <F4> <C-\><C-o>:CoqToCursor<CR>
-endfunction
-
-function! coquille#CoqideMapping()
-    "" ---  CoqIde key bindings
-    "" Unreliable: doesn't work with all terminals, doesn't work through tmux,
-    ""  etc.
-    map <buffer> <silent> <C-A-Up>    :CoqUndo<CR>
-    map <buffer> <silent> <C-A-Left>  :CoqToCursor<CR>
-    map <buffer> <silent> <C-A-Down>  :CoqNext<CR>
-    map <buffer> <silent> <C-A-Right> :CoqToCursor<CR>
-
-    imap <buffer> <silent> <C-A-Up>    <C-\><C-o>:CoqUndo<CR>
-    imap <buffer> <silent> <C-A-Left>  <C-\><C-o>:CoqToCursor<CR>
-    imap <buffer> <silent> <C-A-Down>  <C-\><C-o>:CoqNext<CR>
-    imap <buffer> <silent> <C-A-Right> <C-\><C-o>:CoqToCursor<CR>
 endfunction
 
 function! coquille#GetCurWord()
@@ -102,6 +73,16 @@ function! coquille#GetCurWord()
     setlocal iskeyword-=.
 
     return l:cword
+endfunction
+
+function! coquille#QueryMapping()
+    map <silent> <leader>cs :Coq SearchAbout <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
+    map <silent> <leader>ch :Coq Check <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
+    map <silent> <leader>ca :Coq About <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
+    map <silent> <leader>cp :Coq Print <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
+    map <silent> <leader>cf :Coq Locate <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
+
+    map <silent> <leader>co :CoqGoTo <C-r>=expand(coquille#GetCurWord())<CR><CR>
 endfunction
 
 function! coquille#LeaderMapping()
@@ -118,13 +99,7 @@ function! coquille#LeaderMapping()
 
     map <silent> <leader>cG :GotoDot<CR>
 
-    map <silent> <leader>cs :Coq SearchAbout <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
-    map <silent> <leader>ch :Coq Check <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
-    map <silent> <leader>ca :Coq About <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
-    map <silent> <leader>cp :Coq Print <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
-    map <silent> <leader>cf :Coq Locate <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
-
-    map <silent> <leader>co :CoqGoTo <C-r>=expand(coquille#GetCurWord())<CR><CR>
+    call coquille#QueryMapping()
 endfunction
 
 function! coquille#RestorePanels()
@@ -180,11 +155,13 @@ function! coquille#Launch(...)
         " nothing really problematic will happen, as sync will be called the next
         " time you explicitly call a command (be it 'rewind' or 'interp')
         " TODO: fix switching args while in info or goal buffer
-        au InsertEnter <buffer> Py coquille.sync()
-        au BufWinLeave <buffer> only
-        au BufWinLeave <buffer> Py coquille.hide_color()
-        au BufWinEnter <buffer> call coquille#RestorePanels()
-        au BufWinEnter <buffer> Py coquille.reset_color(); coquille.remem_goal()
+        augroup coquille#Main
+            au InsertEnter <buffer> Py coquille.sync()
+            au BufWinLeave <buffer> only
+            au BufWinLeave <buffer> Py coquille.hide_color()
+            au BufWinEnter <buffer> call coquille#RestorePanels()
+            au BufWinEnter <buffer> Py coquille.reset_color(); coquille.remem_goal()
+        augroup end
     endif
 endfunction"
 
