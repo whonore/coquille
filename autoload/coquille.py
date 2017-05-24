@@ -142,12 +142,12 @@ def coq_next(clear=True):
         goto_last_sent_dot()
 
 def coq_raw_query(*args):
-    clear_info()
-
     bdata = buf_data[vim.current.buffer]
     if bdata['coqtop'].coqtop is None:
         print("Error: Coqtop isn't running. Are you sure you called :CoqLaunch?")
         return
+
+    clear_info()
 
     raw_query = ' '.join(args)
 

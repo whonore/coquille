@@ -166,7 +166,7 @@ function! coquille#Launch(...)
             au BufWinEnter <buffer> Py coquille.reset_color(); coquille.remem_goal()
         augroup end
     endif
-endfunction"
+endfunction
 
 function! coquille#Register()
     hi default CheckedByCoq ctermbg=17 guibg=LightGreen
@@ -181,4 +181,7 @@ function! coquille#Register()
     endif
 
     command! -bar -buffer -nargs=* -complete=file CoqLaunch call coquille#Launch(<f-args>)
+
+    " Define a dummy command for Coq so it does not autocomplete to CoqLaunch and cause coqtop to hang
+    command! -buffer -nargs=* Coq echo "Error: Coqtop isn't running. Are you sure you called :CoqLaunch?"
 endfunction
