@@ -13,7 +13,10 @@ endif
 " TODO: should be s: variable, but since Py command is in .vimrc it doesn't see it
 let g:coquille#current_dir = expand("<sfile>:p:h")
 let g:counter = 0
-let g:proj_file = '_CoqProject'
+
+if !exists('g:coqproject')
+    let g:coqproject = "_CoqProject"
+endif
 
 if !exists('coquille_auto_move')
     let g:coquille_auto_move="false"
@@ -117,8 +120,8 @@ function! coquille#Launch(...)
     else
         let b:coq_running = 1
 
-        if filereadable(g:proj_file)
-            let l:proj_args = split(join(readfile(g:proj_file)))
+        if filereadable(g:coqproject)
+            let l:proj_args = split(join(readfile(g:coqproject)))
         else
             let l:proj_args = []
         endif
