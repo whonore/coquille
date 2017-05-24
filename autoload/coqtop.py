@@ -3,6 +3,8 @@ import re
 import subprocess
 import xml.etree.ElementTree as ET
 import signal
+import Queue
+import threading
 
 from collections import deque, namedtuple
 
@@ -164,7 +166,7 @@ class Coqtop(object):
                   .replace("&#40;", '(') \
                   .replace("&#41;", ')')
 
-    def get_answer(self):
+    def get_answer(self, response):
         fd = self.coqtop.stdout.fileno()
         data = ''
         while True:
@@ -190,19 +192,34 @@ class Coqtop(object):
                         vp = parse_response(valueNode)
                         if messageNode is not None:
                             if isinstance(vp, Ok):
-                                return Ok(vp.val, messageNode)
-                        return vp
+                                response.put(Ok(vp.val, messageNode))
+                                return
+                        response.put(vp)
+                        return
                 except ET.ParseError:
                     continue
             except OSError:
                 # coqtop died
-                return None
+                response.put(None)
+                return
 
-    def call(self, name, arg, encoding='utf-8'):
+    # TODO: either allow manual interrupt or have adjustable timeout
+    def call(self, name, arg, encoding='utf-8', timeout=None):
         xml = encode_call(name, arg)
         msg = ET.tostring(xml, encoding)
         self.send_cmd(msg)
-        response = self.get_answer()
+        response_q = Queue.Queue()
+        answer_thread = threading.Thread(target=self.get_answer, args=(response_q,))
+        answer_thread.daemon = True
+        answer_thread.start()
+
+        answer_thread.join(timeout)
+        try:
+            response = response_q.get_nowait()
+        except Queue.Empty:
+            print('Coqtop timed out')
+            response = None
+
         return response
 
     def send_cmd(self, cmd):
@@ -236,15 +253,17 @@ class Coqtop(object):
                             )
                     self.coqtop.stderr = None
 
-            r = self.call('Init', Option(None))
+            r = self.call('Init', Option(None), timeout=3)
             assert isinstance(r, Ok)
             self.root_state = r.val
             self.state_id = r.val
-        except OSError:
+            return True
+        except (OSError, AssertionError):
             print("Error: couldn't launch coqtop")
+            return False
 
     def launch_coq(self, *args):
-        self.restart_coq(*args)
+        return self.restart_coq(*args)
 
     def cur_state(self):
         if len(self.states) == 0:
@@ -254,9 +273,7 @@ class Coqtop(object):
 
     def advance(self, cmd, encoding = 'utf-8'):
         r = self.call('Add', ((cmd.decode(encoding), -1), (self.cur_state(), True)), encoding)
-        if r is None:
-            return r
-        if isinstance(r, Err):
+        if r is None or isinstance(r, Err):
             return r
         g = self.goals()
         if isinstance(g, Err):

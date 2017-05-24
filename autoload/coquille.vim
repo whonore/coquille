@@ -165,6 +165,12 @@ function! coquille#Launch(...)
             au BufWinEnter <buffer> call coquille#RestorePanels()
             au BufWinEnter <buffer> Py coquille.reset_color(); coquille.remem_goal()
         augroup end
+
+        " Check if launch_coq failed
+        if b:coq_running == 0
+            let b:coq_running = 1
+            call coquille#KillSession()
+        endif
     endif
 endfunction
 

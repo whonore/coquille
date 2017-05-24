@@ -173,7 +173,8 @@ def coq_raw_query(*args):
 def launch_coq(*args):
     bdata = buf_data[vim.current.buffer]
     bdata['coqtop'] = CT.Coqtop()
-    bdata['coqtop'].restart_coq(*args)
+    if not bdata['coqtop'].restart_coq(*args):
+        vim.command('let b:coq_running = 0')
 
 def debug():
     bdata = buf_data[vim.current.buffer]
