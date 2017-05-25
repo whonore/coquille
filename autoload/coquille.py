@@ -164,7 +164,8 @@ def coq_raw_query(*args):
         if response.msg is not None:
             bdata['info_msg'] = response.msg
     elif isinstance(response, CT.Err):
-        bdata['info_msg'] = ''.join(response.err.itertext())
+        if response.err != 'timeout':
+            bdata['info_msg'] = ''.join(response.err.itertext())
     else:
         print("(ANOMALY) unknown answer: %s" % ET.tostring(response)) # ugly
 

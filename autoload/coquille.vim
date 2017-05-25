@@ -78,6 +78,20 @@ function! coquille#GetCurWord()
     return l:cword
 endfunction
 
+" TODO: recognize string vs number
+function! coquille#SetTimeout()
+    let l:old = b:coq_timeout
+    let b:coq_timeout = input("Set timeout to (secs): ")
+    if b:coq_timeout < 0
+        echo "Invalid timeout, keeping old value"
+        let b:coq_timeout = l:old
+    elseif b:coq_timeout == 0
+        echo "Timeout of 0 will disable timeout"
+    endif
+    let b:coq_timeout = str2nr(b:coq_timeout)
+    echo "timeout=" . b:coq_timeout
+endfunction
+
 function! coquille#QueryMapping()
     map <silent> <leader>cs :Coq SearchAbout <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
     map <silent> <leader>ch :Coq Check <C-r>=expand(coquille#GetCurWord())<CR>.<CR>
@@ -101,6 +115,8 @@ function! coquille#LeaderMapping()
     imap <silent> <leader>cl <C-\><C-o>:CoqToCursor<CR>
 
     map <silent> <leader>cG :GotoDot<CR>
+
+    map <silent> <leader>ct :call coquille#SetTimeout()<CR>
 
     call coquille#QueryMapping()
 endfunction
@@ -184,6 +200,7 @@ function! coquille#Register()
         let b:checked = -1
         let b:sent    = -1
         let b:errors  = -1
+        let b:coq_timeout = 3
     endif
 
     command! -bar -buffer -nargs=* -complete=file CoqLaunch call coquille#Launch(<f-args>)

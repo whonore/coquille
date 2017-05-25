@@ -8,6 +8,8 @@ import threading
 
 from collections import deque, namedtuple
 
+import vim
+
 Ok = namedtuple('Ok', ['val', 'msg'])
 Err = namedtuple('Err', ['err'])
 
@@ -203,8 +205,7 @@ class Coqtop(object):
                 response.put(None)
                 return
 
-    # TODO: either allow manual interrupt or have adjustable timeout
-    def call(self, name, arg, encoding='utf-8', timeout=None):
+    def call(self, name, arg, encoding='utf-8', use_timeout=False):
         xml = encode_call(name, arg)
         msg = ET.tostring(xml, encoding)
         self.send_cmd(msg)
@@ -213,12 +214,20 @@ class Coqtop(object):
         answer_thread.daemon = True
         answer_thread.start()
 
+        if use_timeout:
+            timeout = int(vim.eval('b:coq_timeout'))
+            if timeout == 0:
+                timeout = None
+        else:
+            timeout = None
+
         answer_thread.join(timeout)
         try:
             response = response_q.get_nowait()
         except Queue.Empty:
-            print('Coqtop timed out')
-            response = None
+            self.coqtop.send_signal(signal.SIGINT)
+            print('Coqtop timed out. You can change the timeout with <leader>ct and try again.')
+            response = Err('timeout')
 
         return response
 
@@ -249,11 +258,11 @@ class Coqtop(object):
                             , stdin = subprocess.PIPE
                             , stdout = subprocess.PIPE
                             , stderr = null
-                            , preexec_fn = self.ignore_sigint
+                            #, preexec_fn = self.ignore_sigint
                             )
                     self.coqtop.stderr = None
 
-            r = self.call('Init', Option(None), timeout=3)
+            r = self.call('Init', Option(None), use_timeout=True)
             assert isinstance(r, Ok)
             self.root_state = r.val
             self.state_id = r.val
@@ -291,7 +300,7 @@ class Coqtop(object):
         return self.call('Edit_at', self.state_id)
 
     def query(self, cmd, encoding = 'utf-8'):
-        r = self.call('Query', (cmd, self.cur_state()), encoding)
+        r = self.call('Query', (cmd, self.cur_state()), encoding, use_timeout=True)
         return r
 
     def goals(self):
