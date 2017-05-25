@@ -224,7 +224,7 @@ syn region coqProofEnder contained matchgroup=coqError start="\<\%(Abort\|Admitt
 syn region coqProofEnder contained contains=coqIdent matchgroup=coqProofDelim start="\<Save\>" matchgroup=coqVernacPunctuation end="\.\_s"
 
 syn keyword coqTactic    contained absurd apply assert assumption auto
-syn keyword coqTactic    contained case[_eq] change clear[body] cofix cbv compare compute congruence constructor contradiction cut[rewrite]
+syn keyword coqTactic    contained case[_eq] change clear[body] cofix cbn cbv compare compute congruence constructor contradiction cut[rewrite]
 syn keyword coqTactic    contained decide decompose dependent destruct discriminate double
 syn keyword coqTactic    contained eapply eassumption eauto econstructor elim[type] equality erewrite evar exact eexact exists eexists exfalso
 syn keyword coqTactic    contained fix f_equal fold functional generalize hnf
