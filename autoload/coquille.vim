@@ -179,7 +179,7 @@ function! coquille#Launch(...)
             au BufWinLeave <buffer> only
             au BufWinLeave <buffer> Py coquille.hide_color()
             au BufWinEnter <buffer> call coquille#RestorePanels()
-            au BufWinEnter <buffer> Py coquille.reset_color(); coquille.remem_goal()
+            au BufWinEnter <buffer> Py coquille.reset_color(); coquille.remem_goal(); coquille.show_info()
         augroup end
 
         " Check if launch_coq failed
@@ -201,10 +201,10 @@ function! coquille#Register()
         let b:sent    = -1
         let b:errors  = -1
         let b:coq_timeout = 3
+
+        " Define a dummy command for Coq so it does not autocomplete to CoqLaunch and cause coqtop to hang
+        command! -buffer -nargs=* Coq echo "Error: Coqtop isn't running. Are you sure you called :CoqLaunch?"
     endif
 
     command! -bar -buffer -nargs=* -complete=file CoqLaunch call coquille#Launch(<f-args>)
-
-    " Define a dummy command for Coq so it does not autocomplete to CoqLaunch and cause coqtop to hang
-    command! -buffer -nargs=* Coq echo "Error: Coqtop isn't running. Are you sure you called :CoqLaunch?"
 endfunction
