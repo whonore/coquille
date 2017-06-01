@@ -159,9 +159,6 @@ class Coqtop(object):
                 pass
             self.coqtop = None
 
-    def ignore_sigint(self):
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
-
     def escape(self, cmd):
         return cmd.replace("&nbsp;", ' ') \
                   .replace("&apos;", '\'') \
@@ -258,7 +255,6 @@ class Coqtop(object):
                             , stdin = subprocess.PIPE
                             , stdout = subprocess.PIPE
                             , stderr = null
-                            #, preexec_fn = self.ignore_sigint
                             )
                     self.coqtop.stderr = None
 
@@ -280,8 +276,9 @@ class Coqtop(object):
         else:
             return self.state_id
 
+    # TODO: allow timeout
     def advance(self, cmd, encoding = 'utf-8'):
-        r = self.call('Add', ((cmd.decode(encoding), -1), (self.cur_state(), True)), encoding)
+        r = self.call('Add', ((cmd.decode(encoding), -1), (self.cur_state(), True)), encoding, use_timeout=False)
         if r is None or isinstance(r, Err):
             return r
         g = self.goals()
@@ -300,7 +297,7 @@ class Coqtop(object):
         return self.call('Edit_at', self.state_id)
 
     def query(self, cmd, encoding = 'utf-8'):
-        r = self.call('Query', (cmd, self.cur_state()), encoding, use_timeout=True)
+        r = self.call('Query', (cmd.decode(encoding), self.cur_state()), encoding, use_timeout=True)
         return r
 
     def goals(self):

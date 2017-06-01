@@ -150,9 +150,7 @@ def coq_raw_query(*args):
     clear_info()
 
     raw_query = ' '.join(args)
-
     encoding = vim.eval("&encoding") or 'utf-8'
-
     response = bdata['coqtop'].query(raw_query, encoding)
 
     if response is None:
@@ -372,6 +370,8 @@ def parse_locate(msg):
             locs.append((None, '', None))
             break
 
+        # TODO: bug with long paths, such as with le
+        # Find longest matching substring for file
         where = loc[1].split('.')
         if where[0] == 'Coq':
             locs.append((ltype, 'Coq', None))
@@ -502,6 +502,9 @@ def send_until_fail(clear=True):
             bdata['send_queue'].clear()
             if isinstance(response, CT.Err):
                 response = response.err
+                if response == 'timeout':
+                    # TODO: handle this
+                    break
                 if clear:
                     bdata['info_msg'] = ''.join(response.itertext())
                 loc_s = response.get('loc_s')
